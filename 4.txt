@@ -1,4 +1,4 @@
-funcs = ['matmul', 'DFT', 'IDFT', 'FFT', 'IFFT', 'euler', 'pc', 'rk3', 'rk4', 'am5', 'T', 'above_triag', 'jacobi', 'jacobi_eigen', 'blocks_to_matrix', 'shtrassen', 'dot_product', 'to_square_mat', 'power_method', 'euler_sys', 'central_difference', 'backward_difference', 'forward_difference']
+funcs = ['matmul', 'DFT', 'IDFT', 'FFT', 'IFFT', 'euler', 'pc', 'rk3', 'rk4', 'am5', 'T', 'above_triag', 'jacobi', 'jacobi_eigen', 'blocks_to_matrix', 'shtrassen', 'dot_product', 'to_square_mat', 'power_method', 'euler_sys', 'central_difference', 'backward_difference', 'forward_difference', 'norm_vec', 'proj', 'QR_decomp', 'norm_below_diag', 'QR_algorithm']
 
 import inspect
 from pandas.io import clipboard
@@ -250,9 +250,7 @@ dict = {
 
 'forward_difference': '''def forward_difference(f, x, h):
     return (f(x + h) - f(x)) / h''',
-    
-    
-    
+
 'euler_sys': '''def euler_sys(f1, f2, y1_0, y2_0, x0, x_end, h):
     # Количество шагов
     n_steps = int((x_end - x0) / h) + 1
@@ -270,6 +268,49 @@ dict = {
         y1_values[i] = y1_values[i - 1] + h * f1(y1_values[i - 1], y2_values[i - 1])
         y2_values[i] = y2_values[i - 1] + h * f2(y1_values[i - 1], y2_values[i - 1])
 
-    return x_values, y1_values, y2_values'''
+    return x_values, y1_values, y2_values''',
+
+'norm_vec': '''def norm_vec(vec):
+    len_squared = dot_product(vec, vec)
+    return np.sqrt(len_squared) / len_squared * vec''',
+
+'proj': '''def proj(a, b):
+    return b * (dot_product(a, b) / dot_product(b, b))''',
+
+'QR_decomp': '''def QR_decomp(A):
+    # Для разложения используется процесс Грамма-Шмидта
+    Q_t = []
+    for vec_col in T(A):
+        proj_sum = np.zeros(len(vec_col))
+        for bi in Q_t:
+            proj_sum = proj_sum + proj(vec_col, bi)
+
+        Q_t.append(vec_col - proj_sum)
+
+    Q_t = np.array(list(map(norm_vec, Q_t)))
+    R = matmul(Q_t, A)
+
+    return T(Q_t), R''',
+
+'norm_below_diag': '''def norm_below_diag(A):
+    A_t = T(A)
+    return sum([A_t[i, j] ** 2 for (i, j) in above_triag(A_t)])''',
+
+'QR_algorithm': '''def QR_algorithm(A, e=0.001):
+    """Приводит матрицу к треугольной форме, возвращает результат"""
+    Ak = A
+
+    # Вычисляем норму элементов под главной диагональю
+    norm = norm_below_diag(Ak)
+    while norm > e:
+        # QR-разложение
+        Q, R = QR_decomp(Ak)
+
+        # Шаг QR-алгоритма
+        Ak = matmul(R, Q)
+
+        # Обновляем норму элементов под главной диагональю
+        norm = norm_below_diag(Ak)
+    return Ak'''
 
 }
