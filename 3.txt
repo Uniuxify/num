@@ -1,0 +1,271 @@
+funcs = ['matmul', 'DFT', 'IDFT', 'FFT', 'IFFT', 'euler', 'pc', 'rk3', 'rk4', 'am5', 'T', 'above_triag', 'jacobi', 'jacobi_eigen', 'blocks_to_matrix', 'shtrassen', 'dot_product', 'to_square_mat', 'power_method', 'euler_sus']
+
+import inspect
+from pandas.io import clipboard
+
+def func(name):
+    clipboard.copy(inspect.getsource(globals()['euler']))
+
+def matmul(A: np.ndarray, B: np.ndarray):
+    res = []
+    for row in A:
+        new_row = []
+        for col in np.transpose(B):
+            new_row.append(sum(row * col))
+        res.append(new_row)
+    return np.array(res)
+
+def DFT(x):
+    N = len(x)
+    n = np.arange(N)
+    k = np.transpose([n])
+    e = np.exp(-2j*np.pi*k*n/N)
+    return matmul(e, np.transpose(np.array([x]))).flatten()
+    
+ 
+def IDFT(x):
+    N = len(x)
+    n = np.arange(N)
+    k = np.transpose([n])
+
+    e = np.exp(2j*np.pi*k*n/N)
+    return matmul(e, np.transpose(np.array([x]))).flatten()/N
+
+def FFT(x):
+	N = len(x)
+
+	if N == 1:
+		return x
+	else:
+		X_even = FFT(x[::2])
+		X_odd = FFT(x[1::2])
+		factor = np.exp(-2j * np.pi * np.arange(N) / N)
+		X = np.array([*(X_even + factor[:int(N/2)] * X_odd), *(X_even + factor[int(N/2):] * X_odd)])
+		return X
+
+        
+def IFFT(x):
+    N = len(x)
+
+    if N == 1:
+        return x
+    else:
+        X_even = IFFT(x[0:N:2])
+        X_odd =  IFFT(x[1:N:2])
+        e = np.exp(2j*np.pi*np.arange(N)/N)
+        X = np.array([*(X_even + e[:N//2] * X_odd), *(X_even + e[N//2:] * X_odd)]) / 2
+        return X
+        
+        
+def euler(f, x_start, x_end, y0, h):
+    x = np.arange(x_start, x_end, h)
+    y = np.zeros_like(x)
+    y[0] = y0
+    for i in range(len(x)-1):
+        y[i+1] = y[i] + h * f(x[i], y[i])
+        
+    return x, y
+
+def pc(f, x_start, x_end, y0, h):
+    x = np.arange(x_start, x_end, h)
+    y = np.zeros_like(x)
+    y[0] = y0
+    for i in range(len(x)-1):
+        yp = y[i] + h*f(x[i], y[i])
+        y[i+1] = y[i] + h * (f(x[i], y[i]) + f(x[i+1], yp))/2
+
+    return x, y
+
+def rk3(f, x_start, x_end, y0, h):
+    x = np.arange(x_start, x_end, h)
+    y = np.zeros_like(x)
+
+    y[0] = y0
+
+    for i in range(len(x)-1):
+        k1 = f(x[i], y[i])
+        k2 = f(x[i] + h/2, y[i] + h/2 * k1)
+        k3 = f(x[i] + h, y[i] - h*k1 + 2*h*k2)
+        y[i+1] = y[i] + h/6 * (k1 + 4*k2 + k3)
+    return x, y
+
+def rk4(f, x_start, x_end, y0, h):
+    x = np.arange(x_start, x_end, h)
+    y = np.zeros_like(x)
+
+    y[0] = y0
+
+    for i in range(len(x)-1):
+        k1 = f(x[i], y[i])
+        k2 = f(x[i] + h/2, y[i] + h/2 * k1)
+        k3 = f(x[i] + h/2, y[i] + h/2 * k2)
+        k4 = f(x[i] + h, y[i] + h * k3)
+        y[i+1] = y[i] + h/6 * (k1 + 2*k2 + 2*k3 + k4)
+    return x, y
+
+def am5(f, x_start, x_end, y0, h):
+    x = np.arange(x_start, x_end, h)
+    y = np.zeros_like(x)
+    y[0] = y0
+
+    for i in range(4):
+        k1 = f(x[i], y[i])
+        k2 = f(x[i] + h/2, y[i] + h/2 * k1)
+        k3 = f(x[i] + h/2, y[i] + h/2 * k2)
+        k4 = f(x[i] + h, y[i] + h * k3)
+        y[i+1] = y[i] + h/6 * (k1 + 2*k2 + 2*k3 + k4)
+
+    coeff_A = np.array([[1,1,1,1,1], [0,-1,-2,-3,-4], [0,0,2,6,12],[0,0,0,-6,-24], [0,0,0,0,24]])
+    coeff_b = np.array([1,1/2,5/6,9/4,251/30])
+    ab = np.linalg.solve(coeff_A, coeff_b)
+
+    am = np.array([251, 646, -264, 106, -19])/720
+    for i in range(4, len(x)-1):
+        yp = y[i] + h*(ab[0] * f(x[i], y[i]) + ab[1] * f(x[i-1], y[i-1]) +  ab[2] * f(x[i-2], y[i-2]) +
+                          ab[3] * f(x[i-3], y[i-3]) +  ab[4] * f(x[i-4], y[i-4]))
+        
+        y[i+1] = y[i] + h*(am[0]*f(x[i+1], yp) + am[1]*f(x[i], y[i]) + am[2]*f(x[i-1], y[i-1])
+        + am[3]*f(x[i-2], y[i-3])+ am[4]*f(x[i-3], y[i-3]))
+        
+    return x, y
+    
+    
+def T(A):
+    return np.array(list(zip(*A)))
+
+def above_triag(A):
+    n = len(A)
+
+    for j0 in range(1, n):
+        for j in range(j0, n):
+            yield j0-1, j
+
+def jacobi(phi, i, j, n):
+    E = np.eye(n)
+    E[i, i] = np.cos(phi)
+    E[j, j] = np.cos(phi)
+    E[i, j] = -np.sin(phi)
+    E[j, i] = np.sin(phi)
+    return E
+
+def jacobi_eigen(A, e=0.001):
+
+    n = len(A)
+
+    step = 0
+    while True:
+        # Получаем координаты наибольшего по модулю в наддиагональном треугольнике значения
+        i, j = max(above_triag(A), key=lambda vec: abs(A[vec[0], vec[1]]))
+
+        # Условие выхода из цикла
+        if abs(A[i, j]) < e:
+            break
+
+        # По формуле находим угол поворота
+        phi = 0.5 * np.arctan(2 * A[i,j] / (A[i, i] - A[j, j]))
+
+        # Вычисляем матрицу Якоби
+        H = jacobi(phi, i, j, n)
+
+        # Шаг итерации (зануление максимального недиагонального элемента)
+        A = matmul(matmul(T(H), A), H) # H.T * A * H
+        step += 1
+    return A
+    
+    
+def blocks_to_matrix(b1, b2, b3, b4):
+    out = []
+    for bi1, bi2 in zip(b1, b2):
+        row1 = list(bi1)
+        row2 = list(bi2)
+        out.append(row1 + row2)
+
+    for bi3, bi4 in zip(b3, b4):
+        row3 = list(bi3)
+        row4 = list(bi4)
+        out.append(row3 + row4)
+
+    return np.array(out)
+
+def shtrassen(A, B):
+    n = len(A)
+    if n == 1:
+        return np.array([[A[0, 0] * B[0, 0]]])
+
+    A11 = A[:n // 2, :n // 2]
+    A22 = A[n // 2:, n // 2:]
+    A12 = A[:n // 2, n // 2:]
+    A21 = A[n // 2:, :n // 2]
+
+    B11 = B[:n // 2, :n // 2]
+    B22 = B[n // 2:, n // 2:]
+    B12 = B[:n // 2, n // 2:]
+    B21 = B[n // 2:, :n // 2]
+
+    D = shtrassen(A11 + A22, B11 + B22)
+    D1 = shtrassen(A12 - A22, B21 + B22)
+    D2 = shtrassen(A21 - A11, B11 + B12)
+    H1 = shtrassen(A11 + A12, B22)
+    H2 = shtrassen(A21 + A22, B11)
+    V1 = shtrassen(A22, B21 - B11)
+    V2 = shtrassen(A11, B12 - B22)
+
+    b1 = D + D1 + V1 - H1
+    b2 = V2 + H1
+    b3 = V1 + H2
+    b4 = D + D2 + V2 - H2
+    return blocks_to_matrix(b1, b2, b3, b4)
+
+
+def dot_product(vec1, vec2):
+    return sum(vec1 * vec2)
+
+
+def to_square_mat(vec):
+    n = len(vec)
+    new = np.zeros((n, n))
+    new[0, :] = vec
+    return new
+
+def power_method(A, e=0.001):
+    b = norm_vec(np.ones(len(A)))
+    eign_prev = 1
+    eign = 0
+    while abs(eign - eign_prev) > e:
+        eign_prev = eign
+        b_next = np.transpose(shtrassen(A, np.transpose(to_square_mat(b))))[0]
+        eign = dot_product(b_next, b)
+        b = norm_vec(b_next)
+
+    return eign
+    
+   
+def central_difference(f, x, h):
+    return (f(x + h) - f(x - h)) / (2 * h)
+
+def backward_difference(f, x, h):
+    return (f(x) - f(x - h)) / h
+
+def forward_difference(f, x, h):
+    return (f(x + h) - f(x)) / h
+    
+    
+    
+def euler_sus(f1, f2, y1_0, y2_0, x0, x_end, h):
+    # Количество шагов
+    n_steps = int((x_end - x0) / h) + 1
+    # Массивы для хранения решений
+    x_values = np.linspace(x0, x_end, n_steps)
+    y1_values = np.zeros(n_steps)
+    y2_values = np.zeros(n_steps)
+
+    # Начальные условия
+    y1_values[0] = y1_0
+    y2_values[0] = y2_0
+
+    # Метод Эйлера
+    for i in range(1, n_steps):
+        y1_values[i] = y1_values[i - 1] + h * f1(y1_values[i - 1], y2_values[i - 1])
+        y2_values[i] = y2_values[i - 1] + h * f2(y1_values[i - 1], y2_values[i - 1])
+
+    return x_values, y1_values, y2_values
